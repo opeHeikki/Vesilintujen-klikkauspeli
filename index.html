@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lintuvisapeli - Yhdistä kuvat ja nimet</title>
+  <style>
+    * { 
+      box-sizing: border-box; 
+      touch-action: manipulation; 
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    html, body { 
+      height: 100vh; 
+      height: 100dvh;
+      margin: 0; 
+      padding: 6px; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      background: #f4f4f9; 
+      overflow: hidden; 
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    
+    /* Pelialueen pääsäiliö (Tietokone: rinnakkain) */
+    .pelialue { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      gap: 10px; 
+      width: 100%;
+      max-width: 1600px;
+      height: calc(100dvh - 50px);
+      margin: 0 auto;
+    }
+    
+    /* Vasen reuna: Kuvat */
+    .kuvat-alue { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      grid-template-rows: repeat(3, 1fr);
+      gap: 6px; 
+      flex-grow: 1;
+      height: 100%;
+    }
+    
+    /* Kuvalaatikko */
+    .card { 
+      background: white; 
+      border: 2px solid #ccc; 
+      border-radius: 6px; 
+      padding: 2px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      height: 100%;
+      overflow: hidden;
+      transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .card:active {
+      transform: scale(0.97);
+    }
+
+    /* Valittu kortti */
+    .card.selected { 
+      background-color: #1976d2 !important; 
+      border-color: #0d47a1 !important;
+    }
+    
+    .card img { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: contain; 
+      border-radius: 4px; 
+      pointer-events: none; 
+    }
+
+    /* Oikea reuna: Nimet */
+    .nimet-alue { 
+      display: grid; 
+      grid-template-columns: repeat(2, 1fr); 
+      grid-template-rows: repeat(6, 1fr);
+      gap: 5px; 
+      width: 280px; 
+      height: 100%;
+    }
+    
+    /* Nimilaatikot */
+    .name-tag { 
+      background: #2e7d32; 
+      color: white; 
+      padding: 2px 4px; 
+      border-radius: 6px; 
+      font-weight: bold; 
+      font-size: 14px; 
+      cursor: pointer; 
+      user-select: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      word-break: break-word;
+      line-height: 1.1;
+      transition: background-color 0.15s, transform 0.1s;
+    }
+    .name-tag:active {
+      background: #1b5e20;
+      transform: scale(0.97);
+    }
+    
+    /* Piilotetut kortit */
+    .hidden {
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* Alapalkki */
+    .ala-palkki {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 1600px;
+      height: 40px;
+      margin: 0 auto;
+    }
+
+    .ohje-alue {
+      flex: 1;
+      font-size: 13px;
+      font-weight: bold;
+      color: #333;
+      text-align: center;
+    }
+
+    .nappi-rivi {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .kello-alue { 
+      flex: 1;
+      font-size: 13px; 
+      font-weight: bold; 
+      color: #2e7d32; 
+      text-align: center;
+    }
+
+    button { 
+      padding: 8px 14px; 
+      font-size: 13px; 
+      font-weight: bold;
+      cursor: pointer; 
+      background: #2e7d32; 
+      color: white; 
+      border: none; 
+      border-radius: 6px; 
+    }
+    button:active { background: #1b5e20; transform: scale(0.96); }
+    
+    .tulokset-btn { background: #1976d2; }
+    .tulokset-btn:active { background: #0d47a1; }
+
+    /* Modal-tulosikkuna mobile-valmiudella */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      width: 85%;
+      max-width: 320px;
+      max-height: 80vh;
+      overflow-y: auto;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .modal-content h2 { margin-top: 0; font-size: 18px; }
+    .modal-content ol { text-align: left; padding-left: 25px; line-height: 1.8; }
+
+    /* MOBIILIOPTIMOINTI (Puhelimen pystynäyttö) */
+    @media (max-width: 768px) {
+      body {
+        padding: 4px;
+      }
+      
+      .pelialue {
+        flex-direction: column;
+        height: calc(100dvh - 55px);
+        gap: 6px;
+      }
+
+      /* Kuvat yläosassa: 3 saraketta x 4 riviä */
+      .kuvat-alue {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        width: 100%;
+        height: 52%;
+        gap: 4px;
+      }
+
+      /* Nimet alaosassa: 3 saraketta x 4 riviä */
+      .nimet-alue {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        width: 100%;
+        height: 48%;
+        gap: 4px;
+      }
+
+      .name-tag {
+        font-size: 11px;
+        padding: 1px 2px;
+      }
+
+      .ala-palkki {
+        height: 45px;
+      }
+
+      .ohje-alue, .kello-alue {
+        font-size: 11px;
+      }
+
+      button {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="pelialue">
+    <div id="kuva-alue" class="kuvat-alue"></div>
+    <div id="nimi-alue" class="nimet-alue"></div>
+  </div>
+
+  <div class="ala-palkki">
+    <div class="ohje-alue">Klikkaa kuvaa ja nimeä</div>
+    
+    <div class="nappi-rivi">
+      <button onclick="aloitaPeli()">Uusi peli</button>
+      <button class="tulokset-btn" onclick="naytaTulokset()">Tulokset</button>
+    </div>
+    
+    <div id="kello" class="kello-alue">Aika: 0 s</div>
+  </div>
+
+  <!-- Tulokset Modal -->
+  <div id="tulokset-modal" class="modal">
+    <div class="modal-content">
+      <h2>Parhaat ajat</h2>
+      <ol id="tulos-lista"></ol>
+      <button onclick="suljeTulokset()">Sulje</button>
+    </div>
+  </div>
+
+  <script>
+    const kaikkiLinnut = [
+      { kuva: "kuvat/Valkoposkihanhi.jpg", nimi: "Valkoposkihanhi" },
+      { kuva: "kuvat/Kanadanhanhi.jpg", nimi: "Kanadanhanhi" },
+      { kuva: "kuvat/Tundrahanhi.jpg", nimi: "Tundrahanhi" },
+      { kuva: "kuvat/Metsähanhi.jpg", nimi: "Metsähanhi" },
+      { kuva: "kuvat/Laulujoutsen.jpg", nimi: "Laulujoutsen" },
+      { kuva: "kuvat/Kyhmyjoutsen.jpg", nimi: "Kyhmyjoutsen" },
+      { kuva: "kuvat/Kuikka.jpg", nimi: "Kuikka" },
+      { kuva: "kuvat/Sinisorsa koiras.jpg", nimi: "Sinisorsa koiras" },
+      { kuva: "kuvat/Sinisorsa naaras.jpg", nimi: "Sinisorsa naaras" },
+      { kuva: "kuvat/Telkkä koiras.jpg", nimi: "Telkkä koiras" },
+      { kuva: "kuvat/Telkkä naaras.jpg", nimi: "Telkkä naaras" },
+      { kuva: "kuvat/Kurki.jpg", nimi: "Kurki" },
+      { kuva: "kuvat/Töyhtöhyyppä.jpg", nimi: "Töyhtöhyyppä" },
+      { kuva: "kuvat/Kuovi.jpg", nimi: "Kuovi" },
+      { kuva: "kuvat/Rantasipi.jpg", nimi: "Rantasipi" },
+      { kuva: "kuvat/Naurulokki.jpg", nimi: "Naurulokki" },
+      { kuva: "kuvat/Kalalokki.jpg", nimi: "Kalalokki" },
+      { kuva: "kuvat/Harmaalokki.jpg", nimi: "Harmaalokki" },
+      { kuva: "kuvat/Kalatiira.jpg", nimi: "Kalatiira" },
+      { kuva: "kuvat/Merikotka.jpg", nimi: "Merikotka" },
+      { kuva: "kuvat/Silkkiuikku.jpg", nimi: "Silkkiuikku" },
+      { kuva: "kuvat/Lehtokurppa.jpg", nimi: "Lehtokurppa" },
+      { kuva: "kuvat/Tavi.jpg", nimi: "Tavi" },
+      { kuva: "kuvat/Harmaahaikara.jpg", nimi: "Harmaahaikara" },
+      { kuva: "kuvat/Tukkasotka.jpg", nimi: "Tukkasotka" },
+      { kuva: "kuvat/Isokoskelo.jpg", nimi: "Isokoskelo" },
+      { kuva: "kuvat/Nokikana.jpg", nimi: "Nokikana" },
+      { kuva: "kuvat/Liro.jpg", nimi: "Liro" },
+      { kuva: "kuvat/Metsäviklo.jpg", nimi: "Metsäviklo" },
+      { kuva: "kuvat/Ruokokerttunen.jpg", nimi: "Ruokokerttunen" },
+      { kuva: "kuvat/Pajusirkku.jpg", nimi: "Pajusirkku" },
+      { kuva: "kuvat/Sääksi.jpg", nimi: "Sääksi" }, 
+      { kuva: "kuvat/Haahka.jpg", nimi: "Haahka" },
+      { kuva: "kuvat/Merimetso.jpg", nimi: "Merimetso" },
+      { kuva: "kuvat/Merilokki.jpg", nimi: "Merilokki" }
+    ];
+
+    let sekunnit = 0;
+    let ajastin = null;
+    let oikeatOsumat = 0;
+    let valittuKuvaNimi = null;
+    let valittuKorttiElem = null;
+
+    function aloitaPeli() {
+      clearInterval(ajastin);
+      sekunnit = 0;
+      oikeatOsumat = 0;
+      valittuKuvaNimi = null;
+      valittuKorttiElem = null;
+      document.getElementById("kello").innerText = `Aika: 0 s`;
+      
+      ajastin = setInterval(() => {
+        sekunnit++;
+        document.getElementById("kello").innerText = `Aika: ${sekunnit} s`;
+      }, 1000);
+
+      const sekoitetut = [...kaikkiLinnut].sort(() => Math.random() - 0.5);
+      const valitutLinnut = sekoitetut.slice(0, 12);
+
+      const kuvat = [...valitutLinnut].sort(() => Math.random() - 0.5);
+      const nimet = [...valitutLinnut].sort(() => Math.random() - 0.5);
+
+      const kuvaAlue = document.getElementById("kuva-alue");
+      const nimiAlue = document.getElementById("nimi-alue");
+      kuvaAlue.innerHTML = "";
+      nimiAlue.innerHTML = "";
+
+      kuvat.forEach(lintu => {
+        const kortti = document.createElement("div");
+        kortti.className = "card";
+        kortti.innerHTML = `<img src="${lintu.kuva}" alt="Lintu">`;
+
+        kortti.addEventListener("click", () => {
+          document.querySelectorAll(".card").forEach(el => el.classList.remove("selected"));
+          valittuKuvaNimi = lintu.nimi;
+          valittuKorttiElem = kortti;
+          kortti.classList.add("selected");
+        });
+
+        kuvaAlue.appendChild(kortti);
+      });
+
+      nimet.forEach(lintu => {
+        const tag = document.createElement("div");
+        tag.className = "name-tag";
+        tag.innerText = lintu.nimi;
+
+        tag.addEventListener("click", () => {
+          if (!valittuKuvaNimi) return;
+
+          if (lintu.nimi === valittuKuvaNimi) {
+            valittuKorttiElem.classList.add("hidden");
+            tag.classList.add("hidden");
+            
+            valittuKuvaNimi = null;
+            valittuKorttiElem = null;
+            
+            oikeatOsumat++;
+
+            if (oikeatOsumat === 12) {
+              clearInterval(ajastin);
+              tallennaTulos(sekunnit);
+              setTimeout(() => {
+                alert(`Hienoa! Saatit kaikki 12 paria kohdalleen ajassa ${sekunnit} sekuntia!`);
+                naytaTulokset();
+              }, 200);
+            }
+          } else {
+            if (valittuKorttiElem) {
+              valittuKorttiElem.classList.remove("selected");
+            }
+            valittuKuvaNimi = null;
+            valittuKorttiElem = null;
+          }
+        });
+
+        nimiAlue.appendChild(tag);
+      });
+    }
+
+    function tallennaTulos(aika) {
+      let ajat = JSON.parse(localStorage.getItem("lintupeli_ajat")) || [];
+      ajat.push(aika);
+      ajat.sort((a, b) => a - b);
+      localStorage.setItem("lintupeli_ajat", JSON.stringify(ajat));
+    }
+
+    function naytaTulokset() {
+      const ajat = JSON.parse(localStorage.getItem("lintupeli_ajat")) || [];
+      const listaElem = document.getElementById("tulos-lista");
+      listaElem.innerHTML = "";
+
+      if (ajat.length === 0) {
+        listaElem.innerHTML = "<p>Ei vielä tallennettuja aikoja.</p>";
+      } else {
+        ajat.forEach(aika => {
+          const li = document.createElement("li");
+          li.innerText = `${aika} sekuntia`;
+          listaElem.appendChild(li);
+        });
+      }
+
+      document.getElementById("tulokset-modal").style.display = "flex";
+    }
+
+    function suljeTulokset() {
+      document.getElementById("tulokset-modal").style.display = "none";
+    }
+
+    aloitaPeli();
+  </script>
+</body>
+</html>
